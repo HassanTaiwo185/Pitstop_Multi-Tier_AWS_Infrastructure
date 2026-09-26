@@ -21,3 +21,100 @@ module "networking" {
 
 
 }
+
+
+# ------------------------------------------------------------
+# Security Module
+# Creates one security group per tier and chains them so each
+# tier only accepts traffic from the tier in front of it:
+# Internet -> ALB (80) -> Web (80) -> DB (5432)
+# ------------------------------------------------------------
+module "security" {
+  source       = "./modules/security"
+  project_name = "pitstop"
+  vpc_id       = module.networking.vpc_id
+
+  security_groups = {
+    alb = "Allow HTTP from the internet to the load balancer"
+    web = "Allow HTTP from the ALB to web servers"
+    db  = "Allow PostgreSQL from web servers to RDS"
+  }
+
+  ingress_rules = {
+    "alb-http-in" = {
+      security_group = "alb"
+      description    = "HTTP from internet"
+      ip_protocol    = "tcp"
+      from_port      = 80
+      to_port        = 80
+      cidr_ipv4      = "0.0.0.0/0"
+    }
+    "web-http-in" = {
+      security_group            = "web"
+      description               = "HTTP from ALB only"
+      ip_protocol               = "tcp"
+      from_port                 = 80
+      to_port                   = 80
+      referenced_security_group = "alb"
+    }
+    "db-postgres-in" = {
+      security_group            = "db"
+      description               = "PostgreSQL from web servers only"
+      ip_protocol               = "tcp"
+      from_port                 = 5432
+      to_port                   = 5432
+      referenced_security_group = "web"
+    }
+  }
+
+  egress_rules = {
+    "alb-to-web" = {
+      security_group            = "alb"
+      description               = "HTTP to web servers"
+      ip_protocol               = "tcp"
+      from_port                 = 80
+      to_port                   = 80
+      referenced_security_group = "web"
+    }
+    "web-all-out" = {
+      security_group = "web"
+      description    = "All outbound (NAT for updates, RDS)"
+      ip_protocol    = "-1"
+      cidr_ipv4      = "0.0.0.0/0"
+    }
+  }
+
+
+  # Stateless subnet-level firewall. Replies need explicit
+  # ephemeral port rules (1024-65535).
+  network_acls = {
+
+    public = {
+      subnet_ids = module.networking.public_subnet_ids
+      ingress = [
+        { rule_no = 100, protocol = "tcp", action = "allow", cidr_block = "0.0.0.0/0", from_port = 80, to_port = 80 },
+        { rule_no = 110, protocol = "tcp", action = "allow", cidr_block = module.networking.vpc_cidr, from_port = 443, to_port = 443 },
+        { rule_no = 120, protocol = "tcp", action = "allow", cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535 },
+      ]
+      egress = [
+        { rule_no = 100, protocol = "tcp", action = "allow", cidr_block = "0.0.0.0/0", from_port = 80, to_port = 80 },
+        { rule_no = 110, protocol = "tcp", action = "allow", cidr_block = "0.0.0.0/0", from_port = 443, to_port = 443 },
+        { rule_no = 120, protocol = "tcp", action = "allow", cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535 },
+      ]
+    }
+
+
+    private = {
+      subnet_ids = module.networking.private_subnet_ids
+      ingress = [
+        { rule_no = 100, protocol = "-1", action = "allow", cidr_block = module.networking.vpc_cidr },
+        { rule_no = 110, protocol = "tcp", action = "allow", cidr_block = "0.0.0.0/0", from_port = 1024, to_port = 65535 },
+      ]
+      egress = [
+        { rule_no = 100, protocol = "-1", action = "allow", cidr_block = module.networking.vpc_cidr },
+        { rule_no = 110, protocol = "tcp", action = "allow", cidr_block = "0.0.0.0/0", from_port = 80, to_port = 80 },
+        { rule_no = 120, protocol = "tcp", action = "allow", cidr_block = "0.0.0.0/0", from_port = 443, to_port = 443 },
+      ]
+    }
+  }
+}
