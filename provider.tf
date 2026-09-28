@@ -21,7 +21,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project   = "Pitstop"
+      Project   = local.project_name
       ManagedBy = "Terraform"
     }
   }
