@@ -136,3 +136,31 @@ module "database" {
   subnet_ids           = module.networking.private_subnet_ids
   db_security_group_id = module.security.security_group_ids["db"]
 }
+
+
+
+# ------------------------------------------------------------
+# Compute Module
+# Builds the golden AMI (S3 + builder EC2), then the launch
+# template, ALB, target group, and Auto Scaling Group.
+# ------------------------------------------------------------
+module "compute" {
+  source                = "./modules/compute"
+  project_name          = local.project_name
+  app_path              = "${path.root}/app"
+  schema_path           = "${path.root}/db/schema.sql"
+  builder_subnet_id     = module.networking.private_subnet_ids[0]
+  web_security_group_id = module.security.security_group_ids["web"]
+
+  # Database connection details (from the database module's outputs)
+  db_host       = module.database.db_endpoint
+  db_port       = module.database.db_port
+  db_name       = module.database.db_name
+  db_secret_arn = module.database.db_secret_arn
+
+  vpc_id                = module.networking.vpc_id
+  public_subnet_ids     = module.networking.public_subnet_ids
+  private_subnet_ids    = module.networking.private_subnet_ids
+  alb_security_group_id = module.security.security_group_ids["alb"]
+
+}
