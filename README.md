@@ -309,18 +309,7 @@ Everything can be recreated with `terraform apply`.
 
 ---
 
-## Known limitations and next steps
-
-This project is a learning and portfolio build. Choices that would change in production:
-
-- **Move the AMI build to Packer** in a CI pipeline, so Terraform only looks up a pre-built image instead of building it during `apply`.
-- **Run schema migrations as a separate pipeline step** (e.g. Flyway), and load sample data only in non-production environments.
-- **Add HTTPS** with an ACM certificate on the ALB and redirect port 80 to 443.
-- **Run Terraform from CI/CD** (e.g. GitHub Actions) instead of a local machine.
-- **Production sizing:** one NAT Gateway per AZ and Multi-AZ RDS for high availability.
-
----
 
 ## Author
 
-**Hassan Ayinde**, Team Leader
+**Hassan Ayinde**
